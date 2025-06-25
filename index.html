@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lawful Survivor: Shape Realms</title>
+  <style>
+    body { margin: 0; background: #111; overflow: hidden; font-family: monospace; color: #eee; }
+    canvas { display: block; margin: 0 auto; background: #222; }
+    #levelInfo { position: absolute; top: 10px; left: 10px; z-index: 1; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <div id="levelInfo">Level: Circle Realm</div>
+  <canvas id="game" width="600" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+
+    let level = 0;
+    const levels = ["Circle", "Triangle", "Square", "Pulse Ring"];
+    const player = { x: 300, y: 300, size: 8, speed: 4 };
+    const keys = {};
+    let bullets = [];
+    let enemies = [];
+    let frame = 0;
+    let levelTimer = 0;
+
+    document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+    document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+    function updatePlayer() {
+      if (keys['w']) player.y -= player.speed;
+      if (keys['s']) player.y += player.speed;
+      if (keys['a']) player.x -= player.speed;
+      if (keys['d']) player.x += player.speed;
+
+      // Keep within bounds
+      player.x = Math.max(0, Math.min(canvas.width, player.x));
+      player.y = Math.max(0, Math.min(canvas.height, player.y));
+    }
+
+    function drawPlayer() {
+      ctx.fillStyle = '#0f0';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function shootSpiral() {
+      const angle = frame * 0.2;
+      bullets.push({ x: player.x, y: player.y, angle, radius: 0 });
+    }
+
+    function updateBullets() {
+      for (let b of bullets) {
+        b.radius += 5;
+        b.x += Math.cos(b.angle) * b.radius * 0.05;
+        b.y += Math.sin(b.angle) * b.radius * 0.05;
+      }
+      bullets = bullets.filter(b => b.x > 0 && b.x < canvas.width && b.y > 0 && b.y < canvas.height);
+    }
+
+    function drawBullets() {
+      ctx.fillStyle = '#0ff';
+      for (let b of bullets) {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function spawnEnemy() {
+      let shape = levels[level];
+      let x = Math.random() * canvas.width;
+      let y = Math.random() * canvas.height;
+      let type = level;
+      enemies.push({ x, y, size: 10 + level * 2, type });
+    }
+
+    function updateEnemies() {
+      for (let e of enemies) {
+        const dx = player.x - e.x;
+        const dy = player.y - e.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        e.x += dx / dist;
+        e.y += dy / dist;
+      }
+    }
+
+    function drawEnemies() {
+      for (let e of enemies) {
+        ctx.fillStyle = ['#f33', '#f80', '#0ff', '#f0f'][e.type % 4];
+        ctx.fillRect(e.x - e.size/2, e.y - e.size/2, e.size, e.size);
+      }
+    }
+
+    function checkCollisions() {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        for (let j = bullets.length - 1; j >= 0; j--) {
+          const b = bullets[j];
+          const dx = e.x - b.x;
+          const dy = e.y - b.y;
+          if (Math.sqrt(dx*dx + dy*dy) < 10) {
+            enemies.splice(i, 1);
+            bullets.splice(j, 1);
+            break;
+          }
+        }
+      }
+    }
+
+    function drawArena() {
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      if (levels[level] === "Circle") {
+        ctx.arc(300, 300, 280, 0, Math.PI * 2);
+      } else if (levels[level] === "Triangle") {
+        ctx.moveTo(300, 20);
+        ctx.lineTo(580, 580);
+        ctx.lineTo(20, 580);
+        ctx.closePath();
+      } else if (levels[level] === "Square") {
+        ctx.rect(20, 20, 560, 560);
+      } else if (levels[level] === "Pulse Ring") {
+        ctx.arc(300, 300, 220 + 30 * Math.sin(frame / 20), 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === ' ') shootSpiral();
+      if (e.key === 'Enter') console.log("Power-up used (placeholder)");
+    });
+
+    function nextLevel() {
+      level++;
+      if (level >= levels.length) {
+        alert("You have survived all shape realms!");
+        document.location.reload();
+      } else {
+        player.x = 300; player.y = 300;
+        bullets = [];
+        enemies = [];
+        frame = 0;
+        levelTimer = 0;
+        document.getElementById("levelInfo").innerText = "Level: " + levels[level] + " Realm";
+      }
+    }
+
+    function loop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawArena();
+      updatePlayer();
+      drawPlayer();
+      updateBullets();
+      drawBullets();
+      updateEnemies();
+      drawEnemies();
+      checkCollisions();
+
+      frame++;
+      levelTimer++;
+      if (frame % 60 === 0 && enemies.length < 10) spawnEnemy();
+
+      if (levelTimer > 1200 && enemies.length === 0) nextLevel();
+
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
